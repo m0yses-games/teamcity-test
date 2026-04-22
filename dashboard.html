@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TeamCity — System Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg:    #0f0f0f;
+      --card:  #1a1a1a;
+      --border:#2a2a2a;
+      --muted: #6b6b6b;
+      --fg:    #f5f5f5;
+    }
+
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--fg); min-height: 100vh; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius:3px; }
+
+    [x-cloak] { display:none !important; }
+
+    .card { background: var(--card); border:1px solid var(--border); border-radius:10px; }
+
+    /* Health card states */
+    .health-stable   { background:#1a1a1a; border-color:#2a2a2a; }
+    .health-warning  { background:#7a4e00; border-color:#9b6500; }
+    .health-critical { background:#7a1515; border-color:#9b1e1e; }
+
+    .health-stable   .health-label  { color:#8a8a8a; }
+    .health-warning  .health-label  { color:#f5c07a; }
+    .health-critical .health-label  { color:#f5a0a0; }
+
+    .health-stable   .health-title  { color:#f5f5f5; }
+    .health-warning  .health-title  { color:#ffffff; }
+    .health-critical .health-title  { color:#ffffff; }
+
+    .health-stable   .health-score  { color:#f5f5f5; }
+    .health-warning  .health-score  { color:#ffffff; }
+    .health-critical .health-score  { color:#ffffff; }
+
+    .health-stable   .health-sublabel { color:#6b6b6b; }
+    .health-warning  .health-sublabel { color:#d4924a; }
+    .health-critical .health-sublabel { color:#d47a7a; }
+
+    .health-stable   .health-footer { color:#6b6b6b; }
+    .health-warning  .health-footer { color:#e8b870; }
+    .health-critical .health-footer { color:#e89090; }
+
+    /* Progress bar */
+    .progress-track { height:4px; border-radius:2px; background:#2e2e2e; overflow:hidden; }
+    .progress-fill  { height:100%; border-radius:2px; transition: width .6s ease; }
+
+    /* Capacity bar */
+    .cap-bar { height:4px; border-radius:2px; overflow:hidden; display:flex; gap:2px; }
+
+    /* Stage dots */
+    .dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+    /* Table */
+    tbody tr { border-bottom:1px solid var(--border); }
+    tbody tr:hover { background:rgba(255,255,255,0.03); }
+    thead tr { border-bottom:1px solid var(--border); }
+
+    /* Nav */
+    .nav-btn { font-size:.8125rem; color:var(--muted); padding:6px 10px; border-radius:6px; cursor:pointer; transition:color .15s,background .15s; }
+    .nav-btn:hover { color:var(--fg); background:rgba(255,255,255,0.06); }
+    .nav-btn.active { color:var(--fg); background:rgba(255,255,255,0.08); }
+
+    /* Form inputs */
+    .fi { background:#141414; border:1px solid var(--border); border-radius:6px; color:var(--fg); font-size:.8rem; padding:6px 10px; outline:none; font-family:'Inter',sans-serif; transition:border-color .15s; }
+    .fi:focus { border-color:#555; }
+    .fi::placeholder { color:var(--muted); }
+    .select-wrap { position:relative; display:inline-block; }
+    select.fi { appearance:none; padding-right:26px; cursor:pointer; }
+    .select-wrap::after { content:''; position:absolute; right:9px; top:50%; transform:translateY(-50%); border:4px solid transparent; border-top-color:var(--muted); pointer-events:none; margin-top:2px; }
+
+    /* Dropdown */
+    .dropdown-menu { background:#222; border:1px solid #333; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.5); padding:2px; min-width:180px; }
+    .dropdown-item { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; font-size:.8125rem; color:var(--fg); cursor:pointer; transition:background .12s; white-space:nowrap; }
+    .dropdown-item:hover { background:rgba(255,255,255,.07); }
+    .dropdown-item.danger { color:#f87171; }
+    .dropdown-item.danger:hover { background:rgba(248,113,113,.08); }
+
+    /* Pill/badge */
+    .pill { display:inline-flex; align-items:center; padding:2px 8px; border-radius:4px; font-size:.75rem; font-weight:500; background:#2a2a2a; color:#c0c0c0; }
+    .pill-red { background:#3d1515; color:#f87171; }
+
+    /* Avatar circle */
+    .avatar { width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.625rem; font-weight:700; color:#111; background:#fff; flex-shrink:0; }
+
+    /* Icon button */
+    .icon-btn { padding:5px; border-radius:5px; cursor:pointer; transition:background .12s; display:inline-flex; align-items:center; justify-content:center; }
+    .icon-btn:hover { background:rgba(255,255,255,.08); }
+
+    /* Simulate toggle */
+    .sim-btn { font-size:.7rem; padding:2px 8px; border-radius:4px; border:1px solid #333; color:var(--muted); cursor:pointer; transition:all .15s; }
+    .sim-btn:hover { border-color:#555; color:var(--fg); }
+    .sim-btn.active { border-color:#555; color:var(--fg); background:rgba(255,255,255,.06); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1.2s linear infinite; }
+
+    /* Floating dropdown — escapes overflow clipping */
+    .dd-float { position:fixed; z-index:9999; }
+
+    /* Critical Issues top strip */
+    .ci-header { background:#1a1a1a; border-bottom:1px solid var(--border); }
+  </style>
+</head>
+<body x-data="dashboard()" x-init="init()">
+
+<!-- ─── TOPBAR ─── -->
+<header style="background:#111;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;">
+  <div style="max-width:1440px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;">
+
+    <!-- Left: Logo + Nav -->
+    <div style="display:flex;align-items:center;gap:20px;">
+      <!-- TeamCity logo -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#0066cc,#0099ff);display:flex;align-items:center;justify-content:center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <span style="font-size:.875rem;font-weight:600;letter-spacing:-.01em;">TeamCity</span>
+      </div>
+
+      <nav style="display:flex;align-items:center;gap:2px;">
+        <span class="nav-btn active">Overview</span>
+        <span class="nav-btn">Projects</span>
+        <span class="nav-btn">Agents</span>
+        <span class="nav-btn">Build Queue</span>
+        <span class="nav-btn">Reports</span>
+      </nav>
+    </div>
+
+    <!-- Right: preview mode + bell + avatar -->
+    <div style="display:flex;align-items:center;gap:12px;">
+      <!-- Status preview -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:.7rem;color:rgba(255,255,255,.3);white-space:nowrap;">Preview:</span>
+        <button class="sim-btn" :class="systemStatus==='stable'?'active':''" @click="setStatus('stable')">Stable</button>
+        <button class="sim-btn" :class="systemStatus==='warning'?'active':''" @click="setStatus('warning')">Warning</button>
+        <button class="sim-btn" :class="systemStatus==='critical'?'active':''" @click="setStatus('critical')">Critical</button>
+      </div>
+      <div style="width:1px;height:20px;background:var(--border);"></div>
+      <button class="icon-btn" style="position:relative;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span style="position:absolute;top:3px;right:3px;width:7px;height:7px;background:#ef4444;border-radius:50%;border:1.5px solid #111;"></span>
+      </button>
+      <div class="avatar" style="width:28px;height:28px;font-size:.6875rem;cursor:pointer;">AK</div>
+    </div>
+
+  </div>
+</header>
+
+<!-- ─── CONTENT ─── -->
+<main style="max-width:1440px;margin:0 auto;padding:24px 24px 40px;">
+
+  <!-- ── ROW 1: 4 equal stat cards ── -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:24px;">
+
+    <!-- 1. System Health -->
+    <div class="card transition-all duration-500"
+         :class="{
+           'health-stable':   systemStatus==='stable',
+           'health-warning':  systemStatus==='warning',
+           'health-critical': systemStatus==='critical'
+         }"
+         style="padding:20px;display:flex;flex-direction:column;">
+
+      <div style="flex:1;">
+        <div class="health-label" style="font-size:.6875rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">System Health</div>
+        <div class="health-title" style="font-size:.9375rem;font-weight:700;line-height:1.3;" x-text="statusConfig[systemStatus].title"></div>
+
+        <div style="margin-top:24px;">
+          <div class="health-score" style="font-size:3rem;font-weight:700;line-height:1;" x-text="statusConfig[systemStatus].score"></div>
+          <div class="health-sublabel" style="font-size:.8125rem;margin-top:4px;">Health Score</div>
+        </div>
+      </div>
+
+      <div class="health-footer" style="font-size:.8rem;line-height:1.45;margin-top:auto;padding-top:20px;"
+           x-text="statusConfig[systemStatus].footer"></div>
+    </div>
+
+    <!-- 2. Build Status -->
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;">
+      <div>
+        <div style="font-size:.6875rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Build Status</div>
+        <div style="font-size:.9375rem;font-weight:700;">Last night</div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:.875rem;color:var(--muted);">Total builds</span>
+          <span style="font-size:.875rem;font-weight:600;">247</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:.875rem;color:var(--muted);">Successful</span>
+          <span style="font-size:.875rem;font-weight:600;color:#4ade80;">218 <span style="color:var(--muted);font-weight:400;">(88%)</span></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:.875rem;color:var(--muted);">Failed</span>
+          <span style="font-size:.875rem;font-weight:600;color:#f87171;">21 <span style="color:var(--muted);font-weight:400;">(8.5%)</span></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:.875rem;color:var(--muted);">In Progress</span>
+          <span style="font-size:.875rem;font-weight:600;">8</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:.875rem;color:var(--muted);">Success rate</span>
+          <span style="font-size:.875rem;font-weight:600;">88%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:88%;background:#22c55e;"></div>
+        </div>
+        <button style="margin-top:10px;font-size:.875rem;color:var(--fg);background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">
+          Show all failed builds
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Agent Status -->
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;">
+      <div>
+        <div style="font-size:.6875rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Agent Status</div>
+        <div style="font-size:.9375rem;font-weight:700;">12 registered</div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span class="dot" style="background:#22c55e;"></span>
+            <span style="font-size:.875rem;color:var(--muted);">Online &amp; Idle</span>
+          </div>
+          <span style="font-size:.875rem;font-weight:600;color:#4ade80;">5</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span class="dot" style="background:#3b82f6;"></span>
+            <span style="font-size:.875rem;color:var(--muted);">Busy</span>
+          </div>
+          <span style="font-size:.875rem;font-weight:600;color:#60a5fa;">5</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span class="dot" style="background:#ef4444;"></span>
+            <span style="font-size:.875rem;color:var(--muted);">Offline</span>
+          </div>
+          <span style="font-size:.875rem;font-weight:600;color:#f87171;">2</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span class="dot" style="background:#555;"></span>
+            <span style="font-size:.875rem;color:var(--muted);">Disabled</span>
+          </div>
+          <span style="font-size:.875rem;font-weight:600;color:var(--muted);">0</span>
+        </div>
+      </div>
+
+      <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border);">
+        <div style="font-size:.875rem;color:var(--muted);margin-bottom:6px;">Capacity utilization</div>
+        <div class="cap-bar" style="gap:2px;">
+          <div style="flex:5;background:#22c55e;border-radius:2px;height:4px;"></div>
+          <div style="flex:5;background:#3b82f6;border-radius:2px;height:4px;"></div>
+          <div style="flex:2;background:#ef4444;border-radius:2px;height:4px;"></div>
+        </div>
+        <button style="margin-top:10px;font-size:.875rem;color:var(--fg);background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px;">
+          Manage agents
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Resource Usage -->
+    <div class="card" style="padding:20px;display:flex;flex-direction:column;">
+      <div>
+        <div style="font-size:.6875rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Resource Usage</div>
+        <div style="font-size:.9375rem;font-weight:700;">Infrastructure</div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px;" x-data>
+        <template x-for="res in resources.bars" :key="res.label">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="font-size:.8125rem;color:var(--muted);" x-text="res.label"></span>
+              <span style="font-size:.8125rem;font-weight:600;" :style="res.color ? 'color:'+res.color : 'color:#4ade80'" x-text="res.display"></span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" :style="`width:${res.pct}%;background:${res.barColor||'#22c55e'}`"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #333;">
+        <span style="font-size:.8125rem;color:var(--muted);">Build queue depth: </span>
+        <button style="font-size:.8125rem;font-weight:600;color:var(--fg);background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:5px;">
+          14 pending
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── CRITICAL ISSUES (only when status = warning or critical) ── -->
+  <template x-if="systemStatus === 'critical'">
+    <div class="card" style="margin-bottom:24px;">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:.9375rem;font-weight:700;">Critical Issues</span>
+          <span class="pill pill-red" style="font-size:.75rem;font-weight:700;padding:1px 7px;" x-text="incidents.length"></span>
+        </div>
+        <button style="font-size:.8rem;color:var(--fg);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          View all issues
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </button>
+      </div>
+
+      <!-- Table -->
+      <div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:10px 20px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);width:46%;">Description</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);width:22%;">Projects</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);width:16%;">Time</th>
+              <th style="padding:10px 20px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);width:16%;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(inc, idx) in incidents" :key="idx">
+              <tr style="border-bottom:1px solid var(--border);transition:background .12s;" @mouseover="$el.style.background='rgba(255,255,255,.025)'" @mouseleave="$el.style.background=''">
+
+                <!-- Description -->
+                <td style="padding:14px 20px;">
+                  <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <!-- Icon -->
+                    <div style="flex-shrink:0;margin-top:1px;">
+                      <template x-if="inc.severity==='critical'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      </template>
+                      <template x-if="inc.severity==='warning'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      </template>
+                    </div>
+                    <div>
+                      <div style="font-size:.875rem;font-weight:600;line-height:1.35;" x-text="inc.description"></div>
+                      <div style="font-size:.8rem;color:var(--muted);margin-top:2px;line-height:1.4;" x-text="inc.detail"></div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Projects -->
+                <td style="padding:14px 16px;">
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                    <template x-for="proj in inc.projects" :key="proj">
+                      <span class="pill" x-text="proj"></span>
+                    </template>
+                  </div>
+                </td>
+
+                <!-- Time -->
+                <td style="padding:14px 16px;">
+                  <div style="font-size:.875rem;font-weight:500;" x-text="inc.time"></div>
+                  <div style="font-size:.75rem;color:var(--muted);margin-top:2px;" x-text="inc.ago"></div>
+                </td>
+
+                <!-- Actions -->
+                <td style="padding:14px 20px;">
+                  <div style="display:flex;align-items:center;gap:8px;" x-data="floatMenu()">
+                    <button style="font-size:.8rem;padding:5px 12px;border-radius:6px;border:1px solid var(--border);color:var(--fg);background:transparent;cursor:pointer;transition:background .12s;" @mouseover="$el.style.background='rgba(255,255,255,.06)'" @mouseleave="$el.style.background=''">Details</button>
+                    <button class="icon-btn" @click="toggle($el)" style="color:var(--muted);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak class="dropdown-menu dd-float" :style="menuStyle"
+                         @click.outside="open=false"
+                         x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                        Restart Agent
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Cancel Build
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Snooze issue for…
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                        View Logs
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Mark as Resolved
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <!-- ── PIPELINES / AGENTS TABS ── -->
+  <div class="card" x-data="{ tab:'pipelines' }">
+
+    <!-- Tab bar -->
+    <div style="display:flex;align-items:stretch;border-bottom:1px solid var(--border);padding:0 20px;height:46px;gap:32px;">
+      <button @click="tab='pipelines'"
+              style="display:inline-flex;align-items:center;padding:0 2px;font-size:.875rem;font-weight:500;background:none;border:none;cursor:pointer;transition:color .15s,box-shadow .15s;outline:none;"
+              :style="tab==='pipelines' ? 'color:var(--fg);box-shadow:inset 0 -2px 0 #6366f1' : 'color:var(--muted);box-shadow:none'">
+        Pipelines
+      </button>
+      <button @click="tab='agents'"
+              style="display:inline-flex;align-items:center;padding:0 2px;font-size:.875rem;font-weight:500;background:none;border:none;cursor:pointer;transition:color .15s,box-shadow .15s;outline:none;"
+              :style="tab==='agents' ? 'color:var(--fg);box-shadow:inset 0 -2px 0 #6366f1' : 'color:var(--muted);box-shadow:none'">
+        Agents
+      </button>
+    </div>
+
+    <!-- ── PIPELINES ── -->
+    <div x-show="tab==='pipelines'">
+      <!-- Filters -->
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);background:#141414;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:180px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search by pipeline name, project, branch…" class="fi" style="width:100%;padding-left:32px;" x-model="pFilter.search" />
+        </div>
+        <div class="select-wrap"><select class="fi" style="width:130px;" x-model="pFilter.status"><option value="">All statuses</option><option value="running">Running</option><option value="success">Success</option><option value="failed">Failed</option><option value="queued">Queued</option><option value="cancelled">Cancelled</option></select></div>
+        <div class="select-wrap"><select class="fi" style="width:130px;" x-model="pFilter.project"><option value="">All projects</option><option>frontend-app</option><option>api-gateway</option><option>auth-service</option><option>data-pipeline</option></select></div>
+        <div class="select-wrap"><select class="fi" style="width:120px;" x-model="pFilter.branch"><option value="">All branches</option><option>main</option><option>develop</option><option>release/2.4</option><option>hotfix/jwt</option><option>feature/auth</option><option>hotfix/jwt</option></select></div>
+        <div class="select-wrap"><select class="fi" style="width:130px;" x-model="pFilter.pusher"><option value="">All pushers</option><option>Maria Chen</option><option>Tom Reyes</option><option>Alex Kim</option><option>Nina Patel</option><option>Jake Morris</option></select></div>
+        <button class="fi" style="color:var(--muted);cursor:pointer;" @click="pFilter={search:'',status:'',project:'',branch:'',pusher:''}">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="padding:10px 20px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Pipeline</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Project</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Branch</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Pusher</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Time</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Stages</th>
+              <th style="padding:10px 20px;width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(pl, idx) in filteredPipelines" :key="idx">
+              <tr style="border-bottom:1px solid var(--border);transition:background .12s;" @mouseover="$el.style.background='rgba(255,255,255,.025)'" @mouseleave="$el.style.background=''">
+
+                <!-- Pipeline name + status icon -->
+                <td style="padding:12px 20px;">
+                  <div style="display:flex;align-items:flex-start;gap:9px;">
+                    <div style="flex-shrink:0;margin-top:2px;">
+                      <template x-if="pl.status==='success'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      </template>
+                      <template x-if="pl.status==='failed'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      </template>
+                      <template x-if="pl.status==='running'">
+                        <svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                      </template>
+                      <template x-if="pl.status==='queued'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      </template>
+                      <template x-if="pl.status==='cancelled'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                      </template>
+                    </div>
+                    <div>
+                      <div style="font-size:.875rem;font-weight:600;line-height:1.3;" x-text="pl.name"></div>
+                      <div style="font-size:.75rem;color:var(--muted);margin-top:2px;" x-text="'#'+pl.id"></div>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Project -->
+                <td style="padding:12px 16px;">
+                  <span class="pill" x-text="pl.project"></span>
+                </td>
+
+                <!-- Branch -->
+                <td style="padding:12px 16px;">
+                  <div style="display:flex;align-items:center;gap:5px;font-size:.8125rem;color:var(--muted);">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    <span x-text="pl.branch"></span>
+                  </div>
+                </td>
+
+                <!-- Pusher -->
+                <td style="padding:12px 16px;">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <div class="avatar" x-text="pl.pusher.split(' ').map(n=>n[0]).join('')"></div>
+                    <span style="font-size:.8125rem;" x-text="pl.pusher"></span>
+                  </div>
+                </td>
+
+                <!-- Time -->
+                <td style="padding:12px 16px;">
+                  <div style="font-size:.8125rem;" x-text="pl.timeLabel"></div>
+                  <div style="font-size:.75rem;color:var(--muted);margin-top:2px;" x-text="pl.duration"></div>
+                </td>
+
+                <!-- Stages -->
+                <td style="padding:12px 16px;">
+                  <div style="display:flex;align-items:center;gap:4px;">
+                    <template x-for="(s,si) in pl.stages" :key="si">
+                      <span class="dot" :style="`background:${s==='ok'?'#22c55e':s==='fail'?'#ef4444':s==='run'?'#3b82f6':'#3a3a3a'}`"></span>
+                    </template>
+                  </div>
+                </td>
+
+                <!-- Actions -->
+                <td style="padding:12px 20px;text-align:right;">
+                  <div style="display:inline-block;" x-data="floatMenu()">
+                    <button class="icon-btn" @click="toggle($el)" style="color:var(--muted);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak class="dropdown-menu dd-float" :style="menuStyle"
+                         @click.outside="open=false"
+                         x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                        Show Logs
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                        Rerun
+                      </div>
+                      <div class="dropdown-item danger">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Cancel
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);">
+        <span style="font-size:.8rem;color:var(--muted);">Showing <span x-text="filteredPipelines.length"></span> of <span x-text="pipelines.length"></span> pipelines</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <button class="fi" style="padding:5px 10px;cursor:pointer;color:var(--muted);">← Prev</button>
+          <button class="fi" style="padding:5px 10px;cursor:pointer;background:#4f46e5;border-color:#4f46e5;color:#fff;">1</button>
+          <button class="fi" style="padding:5px 10px;cursor:pointer;color:var(--muted);">2</button>
+          <button class="fi" style="padding:5px 10px;cursor:pointer;color:var(--muted);">3</button>
+          <button class="fi" style="padding:5px 10px;cursor:pointer;color:var(--muted);">Next →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AGENTS ── -->
+    <div x-show="tab==='agents'">
+      <!-- Filters -->
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid var(--border);background:#141414;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:180px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search agents…" class="fi" style="width:100%;padding-left:32px;" />
+        </div>
+        <div class="select-wrap"><select class="fi" style="width:130px;"><option value="">All statuses</option><option>Online</option><option>Offline</option><option>Busy</option><option>Disabled</option></select></div>
+        <div class="select-wrap"><select class="fi" style="width:120px;"><option value="">All types</option><option>Linux</option><option>Windows</option><option>macOS</option><option>Docker</option></select></div>
+        <button class="fi" style="color:var(--muted);cursor:pointer;">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="padding:10px 20px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Status</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Agent Name</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Type</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Project</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Last Activity</th>
+              <th style="padding:10px 16px;text-align:left;font-size:.6875rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);">Resources</th>
+              <th style="padding:10px 20px;width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(ag, idx) in agents" :key="idx">
+              <tr style="border-bottom:1px solid var(--border);transition:background .12s;" @mouseover="$el.style.background='rgba(255,255,255,.025)'" @mouseleave="$el.style.background=''">
+
+                <td style="padding:12px 20px;">
+                  <div style="display:flex;align-items:center;gap:7px;">
+                    <span class="dot" :style="`background:${ag.status==='online'?'#22c55e':ag.status==='busy'?'#3b82f6':ag.status==='offline'?'#ef4444':'#555'}`"></span>
+                    <span style="font-size:.8125rem;text-transform:capitalize;"
+                          :style="`color:${ag.status==='online'?'#4ade80':ag.status==='busy'?'#60a5fa':ag.status==='offline'?'#f87171':'var(--muted)'}`"
+                          x-text="ag.status"></span>
+                  </div>
+                </td>
+
+                <td style="padding:12px 16px;">
+                  <div style="font-size:.875rem;font-weight:600;font-family:monospace;" x-text="ag.name"></div>
+                  <div style="font-size:.75rem;color:var(--muted);margin-top:2px;" x-text="ag.ip"></div>
+                </td>
+
+                <td style="padding:12px 16px;">
+                  <span class="pill" x-text="ag.type"></span>
+                </td>
+
+                <td style="padding:12px 16px;font-size:.8125rem;color:var(--muted);" x-text="ag.project||'—'"></td>
+
+                <td style="padding:12px 16px;font-size:.8125rem;color:var(--muted);" x-text="ag.lastActivity"></td>
+
+                <td style="padding:12px 16px;min-width:110px;">
+                  <div style="display:flex;flex-direction:column;gap:5px;">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-bottom:3px;">
+                        <span>CPU</span><span x-text="ag.cpu+'%'"></span>
+                      </div>
+                      <div class="progress-track">
+                        <div class="progress-fill" :style="`width:${ag.cpu}%;background:${ag.cpu>80?'#ef4444':ag.cpu>60?'#f59e0b':'#22c55e'}`"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-bottom:3px;">
+                        <span>MEM</span><span x-text="ag.mem+'%'"></span>
+                      </div>
+                      <div class="progress-track">
+                        <div class="progress-fill" :style="`width:${ag.mem}%;background:${ag.mem>80?'#ef4444':ag.mem>60?'#f59e0b':'#22c55e'}`"></div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <td style="padding:12px 20px;text-align:right;">
+                  <div style="display:inline-block;" x-data="floatMenu()">
+                    <button class="icon-btn" @click="toggle($el)" style="color:var(--muted);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                    <div x-show="open" x-cloak class="dropdown-menu dd-float" :style="menuStyle"
+                         @click.outside="open=false"
+                         x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/></svg>
+                        Restart Agent
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+                        Go to Settings
+                      </div>
+                      <div class="dropdown-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        View Logs
+                      </div>
+                      <div class="dropdown-item danger">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <span x-text="ag.status==='disabled'?'Enable Agent':'Disable Agent'"></span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="padding:12px 20px;border-top:1px solid var(--border);">
+        <span style="font-size:.8rem;color:var(--muted);">Showing <span x-text="agents.length"></span> of 12 agents</span>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Footer -->
+<footer style="border-top:1px solid var(--border);padding:12px 24px;margin-top:8px;">
+  <div style="max-width:1440px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:.75rem;color:var(--muted);">TeamCity v2024.03 · Last refreshed <span x-text="currentTime"></span></span>
+    <div style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);">
+      <span class="dot" style="background:#22c55e;width:6px;height:6px;"></span>
+      All services operational
+    </div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script>
+function floatMenu() {
+  return {
+    open: false,
+    menuStyle: '',
+    toggle(btn) {
+      if (this.open) { this.open = false; return; }
+      const r = btn.getBoundingClientRect();
+      const menuW = 188;
+      const left = Math.max(4, r.right - menuW);
+      this.menuStyle = `top:${r.bottom + 4}px;left:${left}px;`;
+      this.open = true;
+    }
+  }
+}
+
+function dashboard() {
+  return {
+    systemStatus: 'critical',
+    currentTime: '',
+
+    pFilter: { search:'', status:'', project:'', branch:'', pusher:'' },
+
+    get filteredPipelines() {
+      return this.pipelines.filter(p => {
+        const q = this.pFilter.search.toLowerCase();
+        if (q && !p.name.toLowerCase().includes(q) && !p.project.toLowerCase().includes(q) && !p.branch.toLowerCase().includes(q)) return false;
+        if (this.pFilter.status  && p.status   !== this.pFilter.status)   return false;
+        if (this.pFilter.project && p.project  !== this.pFilter.project)  return false;
+        if (this.pFilter.branch  && p.branch   !== this.pFilter.branch)   return false;
+        if (this.pFilter.pusher  && p.pusher   !== this.pFilter.pusher)   return false;
+        return true;
+      });
+    },
+
+    statusConfig: {
+      stable: {
+        title:  'System Stable',
+        score:  '98',
+        footer: 'All pipelines and agents operating normally'
+      },
+      warning: {
+        title:  'Warnings Present',
+        score:  '74',
+        footer: '2 agents offline, 21 builds failed in last 24h'
+      },
+      critical: {
+        title:  'Immediate Intervention Required',
+        score:  '31',
+        footer: 'Critical pipeline failures detected — action needed now'
+      }
+    },
+
+    resources: {
+      bars: [
+        { label:'CPU',      display:'54%',      pct:54, barColor:'#22c55e' },
+        { label:'Memory',   display:'66%',      pct:66, barColor:'#22c55e' },
+        { label:'Disk I/O', display:'34%',      pct:34, barColor:'#22c55e' },
+        { label:'Network',  display:'1.2 GB/s', pct:38, barColor:'#3b82f6', color:'#60a5fa' }
+      ]
+    },
+
+    incidents: [
+      {
+        severity: 'critical',
+        description: 'Build agent build-agent-07 is unresponsive',
+        detail: 'No heartbeat received for 14 minutes. Currently assigned builds are stalled.',
+        projects: ['api-gateway','auth-service'],
+        time: '07:43',
+        ago: '2 hours ago'
+      },
+      {
+        severity: 'critical',
+        description: '32 Pipelines failed at Docker push stage',
+        detail: 'Exit code 1 — registry.internal timeout. Retry #3 in progress.',
+        projects: ['frontend-app'],
+        time: '07:40',
+        ago: '2 hours ago'
+      },
+      {
+        severity: 'warning',
+        description: 'High memory usage on build-agent-03 (91%)',
+        detail: 'Memory pressure may cause build failures. Consider restarting the agent.',
+        projects: ['data-pipeline'],
+        time: '06:12',
+        ago: '3 hours ago'
+      }
+    ],
+
+    pipelines: [
+      { id:'4821', status:'failed',    project:'frontend-app',  name:'Build & Deploy Prod',  branch:'release/2.4',   pusher:'Maria Chen',  avatarColor:'#7c3aed', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','ok','fail','skip'] },
+      { id:'4820', status:'running',   project:'api-gateway',   name:'Integration Tests',    branch:'develop',       pusher:'Tom Reyes',   avatarColor:'#0369a1', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','run','skip','skip'] },
+      { id:'4819', status:'success',   project:'auth-service',  name:'Unit Tests + Lint',    branch:'main',          pusher:'Alex Kim',    avatarColor:'#0f766e', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','ok','ok','ok'] },
+      { id:'4818', status:'success',   project:'data-pipeline', name:'ETL Job Scheduler',    branch:'main',          pusher:'Nina Patel',  avatarColor:'#b45309', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','ok','ok','ok','ok','ok'] },
+      { id:'4817', status:'queued',    project:'frontend-app',  name:'E2E Tests',            branch:'feature/auth',  pusher:'Jake Morris', avatarColor:'#be185d', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['skip','skip','skip','skip'] },
+      { id:'4816', status:'success',   project:'api-gateway',   name:'Build Container',      branch:'main',          pusher:'Maria Chen',  avatarColor:'#7c3aed', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','ok','ok'] },
+      { id:'4815', status:'cancelled', project:'auth-service',  name:'Load Test Suite',      branch:'hotfix/jwt',    pusher:'Tom Reyes',   avatarColor:'#0369a1', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','skip','skip','skip','skip'] },
+      { id:'4814', status:'failed',    project:'data-pipeline', name:'Data Validation',      branch:'develop',       pusher:'Alex Kim',    avatarColor:'#0f766e', timeLabel:'Today at 06:04', duration:'8m 14s',  stages:['ok','ok','fail','skip','skip'] },
+    ],
+
+    agents: [
+      { name:'build-agent-01', ip:'10.0.1.11', status:'busy',     type:'Linux',   project:'api-gateway',   lastActivity:'2 min ago',  cpu:78, mem:64 },
+      { name:'build-agent-02', ip:'10.0.1.12', status:'online',   type:'Linux',   project:null,            lastActivity:'5 min ago',  cpu:4,  mem:21 },
+      { name:'build-agent-03', ip:'10.0.1.13', status:'busy',     type:'Linux',   project:'data-pipeline', lastActivity:'just now',   cpu:89, mem:91 },
+      { name:'build-agent-04', ip:'10.0.1.14', status:'online',   type:'Windows', project:null,            lastActivity:'18 min ago', cpu:2,  mem:33 },
+      { name:'build-agent-05', ip:'10.0.1.15', status:'busy',     type:'macOS',   project:'frontend-app',  lastActivity:'just now',   cpu:61, mem:55 },
+      { name:'build-agent-06', ip:'10.0.1.16', status:'online',   type:'Docker',  project:null,            lastActivity:'1 min ago',  cpu:12, mem:28 },
+      { name:'build-agent-07', ip:'10.0.1.17', status:'offline',  type:'Linux',   project:null,            lastActivity:'14 min ago', cpu:0,  mem:0  },
+      { name:'build-agent-08', ip:'10.0.1.18', status:'busy',     type:'Linux',   project:'auth-service',  lastActivity:'just now',   cpu:44, mem:58 },
+      { name:'build-agent-09', ip:'10.0.1.19', status:'online',   type:'Docker',  project:null,            lastActivity:'3 min ago',  cpu:7,  mem:19 },
+      { name:'build-agent-10', ip:'10.0.1.20', status:'offline',  type:'Windows', project:null,            lastActivity:'2 hrs ago',  cpu:0,  mem:0  },
+      { name:'build-agent-11', ip:'10.0.1.21', status:'online',   type:'Linux',   project:null,            lastActivity:'8 min ago',  cpu:3,  mem:45 },
+      { name:'build-agent-12', ip:'10.0.1.22', status:'busy',     type:'macOS',   project:'frontend-app',  lastActivity:'just now',   cpu:55, mem:62 },
+    ],
+
+    init() {
+      this.updateTime();
+      setInterval(() => this.updateTime(), 1000);
+    },
+    updateTime() {
+      this.currentTime = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    },
+    setStatus(s) {
+      this.systemStatus = s;
+    }
+  }
+}
+</script>
+</body>
+</html>
